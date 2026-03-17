@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BUS423 - Honors Project 1</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #283845;
+    --primary-dark: #1e2d38;
+    --accent: #B8B08D;
+    --accent-light: rgba(184,176,141,0.18);
+    --ncstate-dark: #283845;
+    --ncstate-gray: #5a6a75;
+    --ncstate-light: #f4f3f0;
+    --ncstate-white: #ffffff;
+    --border: #d8d4c8;
+    --shadow: 0 2px 8px rgba(40,56,69,0.12);
+
+    /* Chart series palette — two families: blues (from primary) and tans (from accent) */
+    --c0: #283845;   /* S&P Price    — dark navy          */
+    --c1: #4a7a94;   /* Dividends    — medium teal-blue    */
+    --c2: #7aabb8;   /* Earnings     — light blue-teal     */
+    --c3: #B8B08D;   /* P/E Ratio    — warm tan            */
+    --c4: #c4965a;   /* Div Yield    — amber tan           */
+    --c5: #7a6a50;   /* Earn Yield   — dark earthy brown   */
+    --c6: #3d5a6e;   /* CAPE Ratio   — deep slate-blue     */
+    --c7: #b89060;   /* Payout Ratio — warm gold           */
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--ncstate-light);
+    color: var(--ncstate-dark);
+    line-height: 1.6;
+  }
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: var(--ncstate-white);
+    padding: 2rem 1.5rem;
+    text-align: center;
+  }
+  header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.3rem; }
+  header p { font-size: 1.05rem; opacity: 0.88; max-width: 700px; margin: 0 auto; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+  .card {
+    background: var(--ncstate-white);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 1.5rem 1.8rem;
+    margin-bottom: 1.8rem;
+  }
+  .card h2 {
+    font-size: 1.35rem;
+    color: var(--primary);
+    margin-bottom: 1rem;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 0.4rem;
+  }
+  /* Fixed-height chart containers — prevents stretching */
+  .chart-container {
+    position: relative;
+    width: 100%;
+    height: 400px;
+  }
+  .chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Series toggle checkboxes */
+  .series-toggles { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+  .toggle-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.42rem;
+    padding: 0.28rem 0.75rem 0.28rem 0.5rem;
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    background: var(--ncstate-white);
+    font-size: 0.83rem;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .toggle-check:hover { background: var(--ncstate-light); border-color: var(--accent); }
+  .toggle-check input[type="checkbox"] {
+    accent-color: var(--primary);
+    width: 14px; height: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .series-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* DDM Section */
+  .formula-box {
+    background: var(--ncstate-light);
+    border-left: 4px solid var(--primary);
+    padding: 1rem 1.2rem;
+    margin-bottom: 1.2rem;
+    font-size: 1.1rem;
+    border-radius: 0 6px 6px 0;
+  }
+  .formula-box .math { font-family: 'Cambria Math', 'Times New Roman', serif; font-size: 1.25rem; }
+  .slider-group { margin-bottom: 1.1rem; }
+  .slider-label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-weight: 600; margin-bottom: 0.3rem;
+  }
+  .slider-label .value-display { font-weight: 700; color: var(--primary); font-size: 1.05rem; }
+  .slider-row { display: flex; align-items: center; gap: 0.7rem; }
+  .slider-row input[type="range"] { flex: 1; accent-color: var(--accent); height: 6px; }
+  .slider-row input[type="number"] {
+    width: 80px; padding: 0.3rem 0.5rem; border: 1px solid var(--border);
+    border-radius: 5px; font-size: 0.95rem; text-align: center;
+  }
+  .slider-row input[type="number"]:focus { outline: 2px solid var(--primary); border-color: transparent; }
+  .result-box {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: var(--ncstate-white);
+    padding: 1.2rem 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+    margin: 1.2rem 0;
+    font-size: 1.1rem;
+  }
+  .result-box .price { font-size: 2.2rem; font-weight: 700; display: block; margin-top: 0.2rem; }
+  .warning {
+    background: var(--accent-light);
+    color: var(--primary);
+    border: 1px solid var(--accent);
+    padding: 0.7rem 1rem;
+    border-radius: 6px;
+    margin: 0.8rem 0;
+    display: none;
+    font-weight: 500;
+  }
+  .ddm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 768px) { .ddm-grid { grid-template-columns: 1fr; } }
+  .sensitivity-container { position: relative; width: 100%; height: 320px; }
+  .sensitivity-container canvas { width: 100% !important; height: 100% !important; }
+
+  /* DDM Explainer */
+  .explainer-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.1rem;
+  }
+  @media (max-width: 768px) { .explainer-grid { grid-template-columns: 1fr; } }
+  .explainer-item {
+    background: var(--ncstate-light);
+    border-radius: 8px;
+    padding: 1.1rem 1.1rem 1rem;
+    border-top: 3px solid var(--accent);
+  }
+  .explainer-var {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary);
+    font-family: 'Cambria Math', 'Times New Roman', serif;
+    line-height: 1;
+    margin-bottom: 0.15rem;
+  }
+  .explainer-name {
+    font-size: 0.75rem;
+    color: var(--ncstate-gray);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.55rem;
+  }
+  .explainer-effect {
+    display: inline-block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.18rem 0.6rem;
+    border-radius: 12px;
+    margin-bottom: 0.65rem;
+  }
+  .explainer-effect.up       { background: rgba(40,56,69,0.10); color: var(--primary); }
+  .explainer-effect.down     { background: rgba(184,176,141,0.35); color: #4a3f28; }
+  .explainer-effect.nonlinear{ background: rgba(40,56,69,0.06); color: var(--primary); border: 1px solid var(--accent); }
+  .explainer-item p { font-size: 0.87rem; color: var(--ncstate-gray); line-height: 1.57; }
+
+  /* Time Explorer Controls */
+  .time-range-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem 1.5rem;
+    margin-bottom: 0.8rem;
+  }
+  .year-range-display {
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 0.9rem;
+    padding: 0.45rem 1rem;
+    background: var(--accent-light);
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+  }
+  .year-range-display .yr-count {
+    color: var(--ncstate-gray);
+    font-size: 0.83rem;
+    font-weight: 400;
+    margin-left: 0.5rem;
+  }
+  .year-slider-group label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.86rem;
+    color: var(--ncstate-gray);
+    margin-bottom: 0.25rem;
+  }
+  .year-slider-group label strong { color: var(--primary); font-size: 1rem; }
+  .year-slider-group input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+    height: 6px;
+    cursor: pointer;
+  }
+  @media (max-width: 600px) { .time-range-controls { grid-template-columns: 1fr; } }
+
+  /* Shared text helpers */
+  .card-subtitle {
+    margin-bottom: 0.8rem;
+    color: var(--ncstate-gray);
+    font-size: 0.92rem;
+  }
+  .chart-subtitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--ncstate-gray);
+    margin-bottom: 0.6rem;
+  }
+  .formula-desc {
+    margin-top: 0.45rem;
+    font-size: 0.88rem;
+    color: var(--ncstate-gray);
+  }
+
+  footer {
+    text-align: center; padding: 1.2rem; font-size: 0.85rem;
+    color: var(--ncstate-gray); border-top: 1px solid var(--border);
+    margin-top: 1rem;
+  }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>BUS423 &mdash; Honors Project 1</h1>
+  <p>Exploring Shiller's market data (1926&ndash;2024) and stock valuation fundamentals</p>
+</header>
+
+<div class="container">
+
+  <!-- ① Shiller Data Chart -->
+  <div class="card">
+    <h2>Historical Shiller Data (1926–2024)</h2>
+    <p class="card-subtitle">Check or uncheck a series to show/hide it. Data: Robert Shiller's S&amp;P 500 dataset.</p>
+    <div class="series-toggles" id="shillerToggles">
+      <label class="toggle-check">
+        <input type="checkbox" data-series="0" checked>
+        <span class="series-dot" style="background:var(--c0)"></span>
+        S&amp;P 500 Price
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="1" checked>
+        <span class="series-dot" style="background:var(--c1)"></span>
+        Dividends ($)
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="2" checked>
+        <span class="series-dot" style="background:var(--c2)"></span>
+        Earnings ($)
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="3">
+        <span class="series-dot" style="background:var(--c3)"></span>
+        P/E Ratio
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="4">
+        <span class="series-dot" style="background:var(--c4)"></span>
+        Dividend Yield (%)
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="5">
+        <span class="series-dot" style="background:var(--c5)"></span>
+        Earnings Yield (%)
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="6">
+        <span class="series-dot" style="background:var(--c6)"></span>
+        CAPE Ratio
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="7">
+        <span class="series-dot" style="background:var(--c7)"></span>
+        Payout Ratio (%)
+      </label>
+    </div>
+    <div class="chart-container">
+      <canvas id="shillerChart"></canvas>
+    </div>
+  </div>
+
+  <!-- ② DDM Calculator -->
+  <div class="card">
+    <h2>Dividend Discount Model (DDM) Calculator</h2>
+    <div class="formula-box">
+      <span class="math">P&nbsp;=&nbsp;D₀&nbsp;&times;&nbsp;(1 + g)&nbsp;/&nbsp;(r &minus; g)</span>
+      <p class="formula-desc">Gordon Growth Model — values a stock as the present value of its future dividends growing at a constant rate.</p>
+    </div>
+
+    <div class="ddm-grid">
+      <!-- Left: sliders -->
+      <div>
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>D₀ — Current Annual Dividend ($)</span>
+            <span class="value-display" id="d0Display">$2.00</span>
+          </div>
+          <div class="slider-row">
+            <input type="range" id="d0Slider" min="0" max="100" step="0.1" value="2">
+            <input type="number" id="d0Input" min="0" max="100" step="0.1" value="2">
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>g — Dividend Growth Rate (%)</span>
+            <span class="value-display" id="gDisplay">3.0%</span>
+          </div>
+          <div class="slider-row">
+            <input type="range" id="gSlider" min="0" max="15" step="0.1" value="3">
+            <input type="number" id="gInput" min="0" max="15" step="0.1" value="3">
+          </div>
+        </div>
+
+        <div class="slider-group">
+          <div class="slider-label">
+            <span>r — Required Rate of Return (%)</span>
+            <span class="value-display" id="rDisplay">8.0%</span>
+          </div>
+          <div class="slider-row">
+            <input type="range" id="rSlider" min="1" max="20" step="0.1" value="8">
+            <input type="number" id="rInput" min="1" max="20" step="0.1" value="8">
+          </div>
+        </div>
+
+        <div class="warning" id="ddmWarning">
+          ⚠ Growth rate (g) must be less than the required return (r) for the Gordon Growth Model to produce a valid result.
+        </div>
+
+        <div class="result-box">
+          Estimated Fair Value
+          <span class="price" id="ddmPrice">$41.20</span>
+        </div>
+      </div>
+
+      <!-- Right: sensitivity chart -->
+      <div>
+        <h3 class="chart-subtitle">Sensitivity: Price vs. Growth Rate</h3>
+        <div class="sensitivity-container">
+          <canvas id="sensitivityChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ DDM Variable Explainer (directly below DDM sliders) -->
+  <div class="card">
+    <h2>Understanding DDM Variables</h2>
+    <div class="explainer-grid">
+
+      <div class="explainer-item">
+        <div class="explainer-var">D₀</div>
+        <div class="explainer-name">Current Annual Dividend</div>
+        <span class="explainer-effect up">↑ Higher D₀ &rarr; ↑ Higher Price</span>
+        <p>D₀ is the anchor of the entire model — it's the most recent dividend paid per share. The relationship is <strong>strictly linear</strong>: doubling D₀ exactly doubles the estimated fair value. In practice, use the trailing twelve-month (TTM) dividend. For the S&amp;P 500, D₀ reached <strong>$74.83</strong> in 2024, up from $0.69 in 1926.</p>
+      </div>
+
+      <div class="explainer-item">
+        <div class="explainer-var">g</div>
+        <div class="explainer-name">Dividend Growth Rate</div>
+        <span class="explainer-effect nonlinear">↑ Higher g &rarr; ↑↑ Price (nonlinear)</span>
+        <p>g is the most powerful — and dangerous — input. As g approaches r from below, the denominator (r &minus; g) shrinks toward zero and the price <strong>explodes toward infinity</strong>. A 1% change in g near r can swing fair value by hundreds of dollars. S&amp;P 500 dividend growth has historically averaged ~5–6% per year. Never set g &ge; r.</p>
+      </div>
+
+      <div class="explainer-item">
+        <div class="explainer-var">r</div>
+        <div class="explainer-name">Required Rate of Return</div>
+        <span class="explainer-effect down">↑ Higher r &rarr; ↓ Lower Price</span>
+        <p>r is your discount rate — the minimum return you demand to own the stock. It is typically the <strong>risk-free rate</strong> (10-year Treasury yield) plus an <strong>equity risk premium</strong> of ~4–5%. When the Fed raises interest rates, r rises and stock valuations fall — exactly what happened in 2022–2023 when the S&amp;P 500 dropped ~19%.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ④ Time-Filtered Explorer -->
+  <div class="card">
+    <h2>Time-Filtered Data Explorer</h2>
+    <p class="card-subtitle">Drag the sliders to narrow the date range. Check or uncheck series to compare them over any period.</p>
+
+    <div class="year-range-display" id="rangeDisplay">
+      1926 &ndash; 2024 <span class="yr-count">(99 years)</span>
+    </div>
+
+    <div class="time-range-controls">
+      <div class="year-slider-group">
+        <label>From: <strong id="startYearLabel">1926</strong></label>
+        <input type="range" id="startYearSlider" min="1926" max="2024" step="1" value="1926">
+      </div>
+      <div class="year-slider-group">
+        <label>To: <strong id="endYearLabel">2024</strong></label>
+        <input type="range" id="endYearSlider" min="1926" max="2024" step="1" value="2024">
+      </div>
+    </div>
+
+    <div class="series-toggles" id="explorerToggles">
+      <label class="toggle-check">
+        <input type="checkbox" data-series="0" checked>
+        <span class="series-dot" style="background:var(--c0)"></span>
+        S&amp;P 500 Price
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="1" checked>
+        <span class="series-dot" style="background:var(--c1)"></span>
+        Dividends ($)
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="2" checked>
+        <span class="series-dot" style="background:var(--c2)"></span>
+        Earnings ($)
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="3">
+        <span class="series-dot" style="background:var(--c3)"></span>
+        P/E Ratio
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="4">
+        <span class="series-dot" style="background:var(--c4)"></span>
+        Dividend Yield (%)
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="5">
+        <span class="series-dot" style="background:var(--c5)"></span>
+        Earnings Yield (%)
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="6">
+        <span class="series-dot" style="background:var(--c6)"></span>
+        CAPE Ratio
+      </label>
+      <label class="toggle-check">
+        <input type="checkbox" data-series="7">
+        <span class="series-dot" style="background:var(--c7)"></span>
+        Payout Ratio (%)
+      </label>
+    </div>
+
+    <div class="warning" id="explorerWarning" style="display:none;">
+      ⚠ The start year must be earlier than the end year to display a valid time range. Please adjust the sliders.
+    </div>
+    <div class="chart-container" id="explorerChartWrap">
+      <canvas id="explorerChart"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  BUS423 — NC State University &middot; Data source:
+  <a href="http://www.econ.yale.edu/~shiller/data.htm" target="_blank" rel="noopener">Robert Shiller</a>
+</footer>
+
+<script>
+// ─── Shared chart palette (mirrors CSS variables) ─────────────────────
+const C = ['#283845','#4a7a94','#7aabb8','#B8B08D','#c4965a','#7a6a50','#3d5a6e','#b89060'];
+const CA = [
+  'rgba(40,56,69,0.10)',
+  'rgba(74,122,148,0.08)',
+  'rgba(122,171,184,0.08)',
+  'rgba(184,176,141,0.10)',
+  'rgba(196,150,90,0.08)',
+  'rgba(122,106,80,0.08)',
+  'rgba(61,90,110,0.08)',
+  'rgba(184,144,96,0.08)'
+];
+
+// ─── Shiller Data ─────────────────────────────────────────────────────
+const shillerData = [
+  {year:1926,P:13.49,D:0.69,E:1.24},
+  {year:1927,P:17.46,D:0.77,E:1.11},
+  {year:1928,P:23.15,D:0.85,E:1.38},
+  {year:1929,P:21.4,D:0.97,E:1.61},
+  {year:1930,P:15.51,D:0.98,E:0.97},
+  {year:1931,P:8.44,D:0.82,E:0.61},
+  {year:1932,P:6.82,D:0.5,E:0.41},
+  {year:1933,P:9.97,D:0.44,E:0.44},
+  {year:1934,P:9.26,D:0.45,E:0.49},
+  {year:1935,P:13.04,D:0.47,E:0.76},
+  {year:1936,P:17.06,D:0.72,E:1.02},
+  {year:1937,P:11.02,D:0.8,E:1.13},
+  {year:1938,P:12.69,D:0.51,E:0.64},
+  {year:1939,P:12.37,D:0.62,E:0.9},
+  {year:1940,P:10.53,D:0.67,E:1.05},
+  {year:1941,P:8.76,D:0.71,E:1.16},
+  {year:1942,P:9.52,D:0.59,E:1.03},
+  {year:1943,P:11.48,D:0.61,E:0.94},
+  {year:1944,P:13.1,D:0.64,E:0.93},
+  {year:1945,P:17.33,D:0.66,E:0.96},
+  {year:1946,P:15.13,D:0.71,E:1.06},
+  {year:1947,P:15.03,D:0.84,E:1.61},
+  {year:1948,P:15.19,D:0.93,E:2.29},
+  {year:1949,P:16.54,D:1.14,E:2.32},
+  {year:1950,P:19.75,D:1.47,E:2.84},
+  {year:1951,P:23.41,D:1.41,E:2.44},
+  {year:1952,P:26.04,D:1.41,E:2.4},
+  {year:1953,P:24.83,D:1.45,E:2.51},
+  {year:1954,P:34.97,D:1.54,E:2.77},
+  {year:1955,P:44.15,D:1.64,E:3.62},
+  {year:1956,P:46.11,D:1.74,E:3.39},
+  {year:1957,P:41.12,D:1.79,E:3.37},
+  {year:1958,P:53.56,D:1.75,E:2.89},
+  {year:1959,P:58.68,D:1.83,E:3.39},
+  {year:1960,P:56.1,D:1.95,E:3.27},
+  {year:1961,P:69.07,D:2.02,E:3.19},
+  {year:1962,P:63.36,D:2.13,E:3.67},
+  {year:1963,P:71.55,D:2.28,E:4.02},
+  {year:1964,P:83.18,D:2.5,E:4.55},
+  {year:1965,P:88.07,D:2.72,E:5.19},
+  {year:1966,P:80.33,D:2.87,E:5.55},
+  {year:1967,P:91.93,D:2.92,E:5.33},
+  {year:1968,P:98.7,D:3.07,E:5.76},
+  {year:1969,P:93.81,D:3.24,E:5.78},
+  {year:1970,P:83.22,D:3.14,E:5.13},
+  {year:1971,P:98.29,D:3.07,E:5.57},
+  {year:1972,P:109.2,D:3.15,E:6.42},
+  {year:1973,P:97.55,D:3.38,E:8.16},
+  {year:1974,P:68.56,D:3.6,E:8.89},
+  {year:1975,P:86.16,D:3.68,E:7.96},
+  {year:1976,P:102.01,D:4.05,E:9.91},
+  {year:1977,P:98.2,D:4.67,E:10.87},
+  {year:1978,P:96.02,D:5.07,E:11.64},
+  {year:1979,P:103.01,D:5.65,E:14.86},
+  {year:1980,P:118.78,D:6.16,E:14.82},
+  {year:1981,P:128.05,D:6.63,E:15.18},
+  {year:1982,P:119.71,D:6.87,E:12.64},
+  {year:1983,P:160.46,D:7.09,E:13.29},
+  {year:1984,P:160.46,D:7.53,E:16.64},
+  {year:1985,P:186.84,D:7.9,E:14.61},
+  {year:1986,P:236.34,D:8.19,E:14.43},
+  {year:1987,P:264.51,D:8.93,E:17.5},
+  {year:1988,P:265.79,D:9.73,E:23.76},
+  {year:1989,P:323.06,D:11.05,E:22.34},
+  {year:1990,P:334.59,D:12.09,E:21.34},
+  {year:1991,P:376.18,D:12.2,E:19.3},
+  {year:1992,P:415.74,D:12.38,E:19.09},
+  {year:1993,P:451.41,D:12.58,E:21.88},
+  {year:1994,P:460.42,D:13.18,E:30.6},
+  {year:1995,P:541.72,D:13.79,E:33.96},
+  {year:1996,P:670.5,D:14.89,E:38.73},
+  {year:1997,P:873.43,D:15.52,E:39.72},
+  {year:1998,P:1085.5,D:16.2,E:37.71},
+  {year:1999,P:1327.33,D:16.71,E:48.17},
+  {year:2000,P:1427.22,D:16.27,E:50},
+  {year:2001,P:1194.18,D:15.74,E:24.69},
+  {year:2002,P:993.94,D:16.08,E:27.59},
+  {year:2003,P:1037.11,D:17.39,E:48.74},
+  {year:2004,P:1130.65,D:19.407,E:58.55},
+  {year:2005,P:1207.23,D:22.22,E:69.93},
+  {year:2006,P:1310.46,D:24.88,E:81.51},
+  {year:2007,P:1477.19,D:27.73,E:66.18},
+  {year:2008,P:1220.04,D:28.39,E:14.88},
+  {year:2009,P:948.05,D:22.31,E:50.97},
+  {year:2010,P:1139.97,D:22.73,E:77.35},
+  {year:2011,P:1267.64,D:26.02,E:86.95},
+  {year:2012,P:1379.61,D:31.25,E:86.51},
+  {year:2013,P:1643.8,D:34.99,E:100.2},
+  {year:2014,P:2054.27,D:39.44,E:102.31},
+  {year:2015,P:2054.08,D:43.39,E:86.53},
+  {year:2016,P:2246.63,D:45.7,E:94.55},
+  {year:2017,P:2664.34,D:48.93,E:109.88},
+  {year:2018,P:2567.31,D:53.75,E:132.39},
+  {year:2019,P:3176.75,D:58.24,E:139.47},
+  {year:2020,P:3695.31,D:58.28,E:94.13},
+  {year:2021,P:4674.77,D:60.40,E:197.87},
+  {year:2022,P:3912.38,D:66.92,E:172.75},
+  {year:2023,P:4685.05,D:70.30,E:192.43},
+  {year:2024,P:6010.91,D:74.83,E:null}
+];
+
+// Compute derived series
+const years         = shillerData.map(d => d.year);
+const prices        = shillerData.map(d => d.P);
+const divs          = shillerData.map(d => d.D);
+const earns         = shillerData.map(d => d.E);
+const peRatio       = shillerData.map(d => d.E ? +(d.P / d.E).toFixed(2) : null);
+const divYield      = shillerData.map(d => +((d.D / d.P) * 100).toFixed(2));
+const earningsYield = shillerData.map(d => d.E ? +((d.E / d.P) * 100).toFixed(2) : null);
+// CAPE: price / 10-year trailing average of earnings (nominal; first value available 1935)
+const capeRatio = shillerData.map((d, i) => {
+  if (i < 9) return null;
+  const tenYrE = shillerData.slice(i - 9, i + 1).map(x => x.E).filter(e => e !== null);
+  if (!tenYrE.length) return null;
+  const avgE = tenYrE.reduce((a, b) => a + b, 0) / tenYrE.length;
+  return avgE > 0 ? +(d.P / avgE).toFixed(2) : null;
+});
+// Payout Ratio: dividends as % of earnings
+const payoutRatio = shillerData.map(d => (d.E && d.E > 0) ? +((d.D / d.E) * 100).toFixed(2) : null);
+
+// ─── Shared tooltip formatter ─────────────────────────────────────────
+function fmtTooltip(ctx) {
+  const label = ctx.dataset.label;
+  const val   = ctx.parsed.y;
+  if (val === null) return label + ': N/A';
+  if (label === 'Dividend Yield (%)' || label === 'Earnings Yield (%)') return label + ': ' + val.toFixed(2) + '%';
+  if (label === 'P/E Ratio' || label === 'CAPE Ratio') return label + ': ' + val.toFixed(1) + 'x';
+  if (label === 'Payout Ratio (%)') return label + ': ' + val.toFixed(2) + '%';
+  if (label === 'S&P 500 Price') return label + ': $' + val.toLocaleString(undefined, {maximumFractionDigits:2});
+  return label + ': $' + val.toFixed(2);
+}
+
+// ─── Shared chart scales ──────────────────────────────────────────────
+function makeScales(tickLimit) {
+  return {
+    x: {
+      title: { display: true, text: 'Year', font: { size: 12 } },
+      ticks: { maxTicksLimit: tickLimit || 20 }
+    },
+    yPrice: {
+      type: 'linear', position: 'left',
+      title: { display: true, text: 'S&P 500 Price ($)', color: C[0], font: { size: 12 } },
+      ticks: { color: C[0], callback: v => '$' + v.toLocaleString() },
+      grid: { color: 'rgba(40,56,69,0.07)' }
+    },
+    yDivEarn: {
+      type: 'linear', position: 'right',
+      title: { display: true, text: 'Dividends / Earnings ($)', color: C[1], font: { size: 12 } },
+      ticks: { color: C[1], callback: v => '$' + v.toLocaleString() },
+      grid: { drawOnChartArea: false }
+    },
+    yRatio: {
+      type: 'linear', position: 'right',
+      title: { display: true, text: 'Ratios & Percentages', color: C[3], font: { size: 12 } },
+      ticks: { color: C[3] },
+      grid: { drawOnChartArea: false },
+      display: 'auto'
+    }
+  };
+}
+
+// ─── Build dataset definitions ────────────────────────────────────────
+function makeDatasets(dataArrays) {
+  const [p, d, e, pe, dy, ey, cape, pr] = dataArrays;
+  return [
+    { label:'S&P 500 Price',     data:p,       borderColor:C[0], backgroundColor:CA[0], fill:true,  tension:0.25, pointRadius:0, borderWidth:2,   yAxisID:'yPrice'   },
+    { label:'Dividends ($)',     data:d,       borderColor:C[1], backgroundColor:CA[1], fill:false, tension:0.25, pointRadius:0, borderWidth:2,   yAxisID:'yDivEarn' },
+    { label:'Earnings ($)',      data:e,       borderColor:C[2], backgroundColor:CA[2], fill:false, tension:0.25, pointRadius:0, borderWidth:2,   yAxisID:'yDivEarn' },
+    { label:'P/E Ratio',         data:pe,      borderColor:C[3], borderDash:[6,3],       fill:false, tension:0.25, pointRadius:0, borderWidth:2,   yAxisID:'yRatio',  hidden:true },
+    { label:'Dividend Yield (%)',data:dy,      borderColor:C[4], borderDash:[4,4],       fill:false, tension:0.25, pointRadius:0, borderWidth:2,   yAxisID:'yRatio',  hidden:true },
+    { label:'Earnings Yield (%)',data:ey,      borderColor:C[5], borderDash:[2,4],       fill:false, tension:0.25, pointRadius:0, borderWidth:2.5, yAxisID:'yRatio',  hidden:true },
+    { label:'CAPE Ratio',        data:cape||[], borderColor:C[6], borderDash:[8,3],      fill:false, tension:0.25, pointRadius:0, borderWidth:2,   yAxisID:'yRatio',  hidden:true },
+    { label:'Payout Ratio (%)',  data:pr||[],   borderColor:C[7], borderDash:[3,2],      fill:false, tension:0.25, pointRadius:0, borderWidth:2,   yAxisID:'yRatio',  hidden:true }
+  ];
+}
+
+// ─── Shiller Chart ────────────────────────────────────────────────────
+const shillerChart = new Chart(
+  document.getElementById('shillerChart').getContext('2d'),
+  {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: makeDatasets([prices, divs, earns, peRatio, divYield, earningsYield, capeRatio, payoutRatio])
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor:'rgba(40,56,69,0.93)', titleFont:{size:13}, bodyFont:{size:12}, callbacks:{ label: fmtTooltip } }
+      },
+      scales: makeScales(20)
+    }
+  }
+);
+
+document.querySelectorAll('#shillerToggles input[type="checkbox"]').forEach(cb => {
+  cb.addEventListener('change', function() {
+    shillerChart.data.datasets[+this.dataset.series].hidden = !this.checked;
+    shillerChart.update();
+  });
+});
+
+// ─── DDM Calculator ───────────────────────────────────────────────────
+const d0Slider = document.getElementById('d0Slider');
+const d0Input  = document.getElementById('d0Input');
+const d0Disp   = document.getElementById('d0Display');
+const gSlider  = document.getElementById('gSlider');
+const gInput   = document.getElementById('gInput');
+const gDisp    = document.getElementById('gDisplay');
+const rSlider  = document.getElementById('rSlider');
+const rInput   = document.getElementById('rInput');
+const rDisp    = document.getElementById('rDisplay');
+const priceEl  = document.getElementById('ddmPrice');
+const warnEl   = document.getElementById('ddmWarning');
+
+function syncPair(slider, input, display, fmt) {
+  const update = val => { slider.value = val; input.value = val; display.textContent = fmt(parseFloat(val)); calcDDM(); };
+  slider.addEventListener('input', () => update(slider.value));
+  input.addEventListener('input',  () => update(input.value));
+}
+syncPair(d0Slider, d0Input, d0Disp, v => '$' + v.toFixed(2));
+syncPair(gSlider,  gInput,  gDisp,  v => v.toFixed(1) + '%');
+syncPair(rSlider,  rInput,  rDisp,  v => v.toFixed(1) + '%');
+
+function ddmPrice(d0, gPct, rPct) {
+  const g = gPct/100, r = rPct/100;
+  return r <= g ? null : (d0 * (1+g)) / (r-g);
+}
+
+function calcDDM() {
+  const d0=parseFloat(d0Slider.value), g=parseFloat(gSlider.value), r=parseFloat(rSlider.value);
+  const p = ddmPrice(d0, g, r);
+  if (p === null || !isFinite(p)) { priceEl.textContent = '—'; warnEl.style.display = 'block'; }
+  else { priceEl.textContent = '$' + p.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); warnEl.style.display = 'none'; }
+  updateSensitivity(d0, g, r);
+}
+
+// ─── Sensitivity Chart ────────────────────────────────────────────────
+const sensitivityChart = new Chart(
+  document.getElementById('sensitivityChart').getContext('2d'),
+  {
+    type: 'bar',
+    data: { labels:[], datasets:[{ label:'Fair Value ($)', data:[], backgroundColor:[], borderColor:[], borderWidth:1, borderRadius:3 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display:false },
+        tooltip: { backgroundColor:'rgba(40,56,69,0.93)', titleFont:{size:13}, bodyFont:{size:12}, callbacks:{ label: ctx => 'Fair Value: $' + (ctx.parsed.y != null ? ctx.parsed.y.toLocaleString(undefined,{maximumFractionDigits:2}) : 'N/A') } }
+      },
+      scales: {
+        x: { title:{ display:true, text:'Growth Rate (g)', font:{size:12} }, ticks:{ font:{size:12} } },
+        y: { title:{ display:true, text:'Fair Value ($)', font:{size:12} }, ticks:{ callback: v => '$'+v.toLocaleString(), font:{size:12} }, beginAtZero:true }
+      }
+    }
+  }
+);
+
+function updateSensitivity(d0, currentG, r) {
+  const maxG=r-0.5, labels=[], data=[], bg=[], bd=[];
+  for (let gv=0; gv<=Math.max(maxG,0); gv+=0.5) {
+    const rv=Math.round(gv*10)/10;
+    labels.push(rv.toFixed(1)+'%');
+    const p=ddmPrice(d0,rv,r);
+    data.push(p!=null&&isFinite(p)?+p.toFixed(2):null);
+    const cur=Math.abs(rv-currentG)<0.25;
+    bg.push(cur?'rgba(40,56,69,0.88)':'rgba(184,176,141,0.55)');
+    bd.push(cur?'#283845':'rgba(184,176,141,0.85)');
+  }
+  Object.assign(sensitivityChart.data, { labels });
+  Object.assign(sensitivityChart.data.datasets[0], { data, backgroundColor:bg, borderColor:bd });
+  sensitivityChart.update();
+}
+
+// ─── Time-Filtered Explorer ───────────────────────────────────────────
+const explorerChart = new Chart(
+  document.getElementById('explorerChart').getContext('2d'),
+  {
+    type: 'line',
+    data: { labels:[], datasets: makeDatasets([[],[],[],[],[],[],[],[]]) },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: { display:false },
+        tooltip: { backgroundColor:'rgba(40,56,69,0.93)', titleFont:{size:13}, bodyFont:{size:12}, callbacks:{ label: fmtTooltip } }
+      },
+      scales: makeScales(15)
+    }
+  }
+);
+
+document.querySelectorAll('#explorerToggles input[type="checkbox"]').forEach(cb => {
+  cb.addEventListener('change', function() {
+    explorerChart.data.datasets[+this.dataset.series].hidden = !this.checked;
+    explorerChart.update();
+  });
+});
+
+const startSlider    = document.getElementById('startYearSlider');
+const endSlider      = document.getElementById('endYearSlider');
+const startLabel     = document.getElementById('startYearLabel');
+const endLabel       = document.getElementById('endYearLabel');
+const rangeDisplay   = document.getElementById('rangeDisplay');
+const explorerWarn   = document.getElementById('explorerWarning');
+const explorerWrap   = document.getElementById('explorerChartWrap');
+
+function refreshExplorer() {
+  const s=parseInt(startSlider.value), e=parseInt(endSlider.value);
+  startLabel.textContent=s; endLabel.textContent=e;
+
+  // Validate: start must be strictly before end
+  if (s >= e) {
+    explorerWarn.style.display = 'block';
+    explorerWrap.style.visibility = 'hidden';
+    rangeDisplay.innerHTML=s+' &ndash; '+e+' <span class="yr-count" style="color:#c4965a;">invalid range</span>';
+    return;
+  }
+
+  explorerWarn.style.display = 'none';
+  explorerWrap.style.visibility = 'visible';
+  const n=e-s+1;
+  rangeDisplay.innerHTML=s+' &ndash; '+e+' <span class="yr-count">('+n+' year'+(n!==1?'s':'')+')</span>';
+  // filter by index so all precomputed arrays stay in sync
+  const idxs = shillerData.reduce((acc, d, i) => { if (d.year >= s && d.year <= e) acc.push(i); return acc; }, []);
+  explorerChart.data.labels = idxs.map(i => years[i]);
+  const ds = explorerChart.data.datasets;
+  ds[0].data = idxs.map(i => prices[i]);
+  ds[1].data = idxs.map(i => divs[i]);
+  ds[2].data = idxs.map(i => earns[i]);
+  ds[3].data = idxs.map(i => peRatio[i]);
+  ds[4].data = idxs.map(i => divYield[i]);
+  ds[5].data = idxs.map(i => earningsYield[i]);
+  ds[6].data = idxs.map(i => capeRatio[i]);
+  ds[7].data = idxs.map(i => payoutRatio[i]);
+  explorerChart.update();
+}
+startSlider.addEventListener('input', refreshExplorer);
+endSlider.addEventListener('input',   refreshExplorer);
+refreshExplorer();
+
+// Initial DDM calculation
+calcDDM();
+</script>
+</body>
+</html>
